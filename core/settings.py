@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'authentication',
     'django_filters',
     'access_management',
-    'threatlogging'
+    'threatlogging',
 ]
 
 MIDDLEWARE = [

@@ -24,3 +24,10 @@ class ErrorLogSerializer(serializers.ModelSerializer):
         model = ErrorLog
         fields = '__all__'
         read_only_fields = ['id', 'timestamp']
+
+from .models import Threat
+class ThreatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Threat
+        fields = '__all__'
+        read_only_fields = ['detected_at']

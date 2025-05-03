@@ -64,3 +64,30 @@ class ErrorLog(BaseLog):
 
     def __str__(self):
         return f"{self.error_type} - {self.username} at {self.timestamp}"
+    
+from django.db import models
+from django.utils import timezone
+
+class ThreatStatus(models.TextChoices):
+    NEW = "New", "New"
+    ESCALATED = "Escalated", "Escalated"
+    RESOLVED = "Resolved", "Resolved"
+    UNDER_INVESTIGATION = "Under Investigation", "Under Investigation"
+
+class Threat(models.Model):
+    log_type = models.CharField(max_length=50, choices=[('Access', 'Access'), ('Activity', 'Activity'), ('Error', 'Error')])
+    log_id = models.PositiveIntegerField()  # ID from the related log table
+    description = models.TextField()
+    risk_score = models.FloatField(default=0.0)
+    detected_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=50, choices=ThreatStatus.choices, default=ThreatStatus.NEW)
+    escalated = models.BooleanField(default=False)
+    resolved_by = models.CharField(max_length=255, blank=True, null=True)
+    resolved_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Threat"
+        verbose_name_plural = "Threats"
+
+    def __str__(self):
+        return f"{self.log_type} Threat (Log ID: {self.log_id}) - {self.status}"

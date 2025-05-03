@@ -113,3 +113,20 @@ class ErrorLogViewSet(viewsets.GenericViewSet,
             serializer = self.get_serializer(logs, many=True)
             return Response(serializer.data)
         return Response({"error": "Error type parameter is required"}, status=400)
+    
+from rest_framework import viewsets, mixins
+from .models import Threat
+from .serializers import ThreatSerializer
+from rest_framework.permissions import IsAuthenticated
+
+class ThreatViewSet(viewsets.GenericViewSet,
+                    mixins.ListModelMixin,
+                    mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.CreateModelMixin):
+    queryset = Threat.objects.all().order_by('-detected_at')
+    serializer_class = ThreatSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['log_type', 'status', 'escalated']
+    search_fields = ['description']
+    ordering_fields = ['detected_at', 'risk_score']
