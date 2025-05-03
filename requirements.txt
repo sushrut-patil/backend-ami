@@ -7,3 +7,4 @@ PyJWT==2.9.0
 setuptools==75.8.0
 sqlparse==0.5.3
 wheel==0.45.1
+django-filter>=2.4.0
