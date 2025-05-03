@@ -24,16 +24,18 @@ class ErrorLogSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']  # Make id read-only since it's auto-generated
 
 
+
 class ThreatSerializer(serializers.ModelSerializer):
     # Custom field to handle the log reference
     related_log_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = Threat
-        fields = ['id', 'log_type', 'content_type', 'object_id', 'description', 
-                 'risk_score', 'detected_at', 'status', 'escalated', 
-                 'resolved_by', 'resolved_at', 'related_log_id']
-        read_only_fields = ['id', 'content_type', 'object_id']  # These are set based on log_type and related_log_id
+        # Remove the problematic field from the explicit fields list
+        fields = ['id', 'log_type', 'description', 'risk_score', 
+                 'detected_at', 'status', 'escalated', 'resolved_by', 
+                 'resolved_at', 'related_log_id']
+        read_only_fields = ['id']  # We'll handle content_type & object_id separately
 
     def create(self, validated_data):
         log_type = validated_data.get('log_type')
@@ -58,8 +60,15 @@ class ThreatSerializer(serializers.ModelSerializer):
         except model_class.DoesNotExist:
             raise serializers.ValidationError(f"No {log_type} log found with id {related_log_id}")
         
-        # Create the threat with the correct content type and object id
-        validated_data['content_type'] = content_type
-        validated_data['object_id'] = related_log_id
+        # Create the threat instance first
+        threat = Threat(**validated_data)
         
-        return super().create(validated_data)
+        # Then set the content_type and object_id attributes directly
+        # This approach works regardless of the actual field name
+        threat.content_type = content_type
+        threat.object_id = related_log_id
+        
+        # Save the new threat
+        threat.save()
+        
+        return threat
