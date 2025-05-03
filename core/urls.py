@@ -19,9 +19,12 @@ from django.urls import path
 from django.urls import path, include
 from rest_framework.documentation import include_docs_urls
 
+import threatlogging
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('authentication.urls')),
     path('api/access/', include('access_management.urls')),
     path('docs/', include_docs_urls(title='Access Management API')),
+    path('api/logs/', include('threatlogging.urls')),
 ]
