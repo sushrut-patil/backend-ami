@@ -1,12 +1,10 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Department, AccessLevel, Employee, EmployeeAccess, AccessAuditLog
-from .filters import (
-    DepartmentFilter, AccessLevelFilter, EmployeeFilter, 
-    EmployeeAccessFilter, AccessAuditLogFilter
-)
+
 from .serializers import (
     DepartmentSerializer,
     AccessLevelSerializer,
@@ -15,6 +13,7 @@ from .serializers import (
     EmployeeAccessSerializer,
     AccessAuditLogSerializer
 )
+from .permissions import IsAdminOrReadOnly, IsAccessManager
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -24,12 +23,13 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     lookup_field = 'dept_id'
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_class = DepartmentFilter
+    filterset_fields = ['dept_id', 'dept_name']
     search_fields = ['dept_id', 'dept_name', 'description']
     ordering_fields = ['dept_id', 'dept_name', 'created_at']
 
-    @action(detail=True)
+    @action(detail=True, permission_classes=[IsAuthenticated])
     def employees(self, request, dept_id=None):
         """Get all employees for a department"""
         department = self.get_object()
@@ -45,12 +45,13 @@ class AccessLevelViewSet(viewsets.ModelViewSet):
     queryset = AccessLevel.objects.all()
     serializer_class = AccessLevelSerializer
     lookup_field = 'access_id'
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_class = AccessLevelFilter
+    filterset_fields = ['access_id', 'access_name', 'risk_score']
     search_fields = ['access_id', 'access_name', 'description']
     ordering_fields = ['access_id', 'access_name', 'risk_score', 'created_at']
 
-    @action(detail=True)
+    @action(detail=True, permission_classes=[IsAuthenticated])
     def employees(self, request, access_id=None):
         """Get all employees with this access level"""
         access_level = self.get_object()
@@ -66,8 +67,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
     lookup_field = 'employee_id'
+    permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_class = EmployeeFilter
+    filterset_fields = ['employee_id', 'department__dept_id', 'job_title']
     search_fields = ['employee_id', 'first_name', 'last_name', 'email', 'job_title']
     ordering_fields = ['employee_id', 'last_name', 'first_name', 'hire_date', 'created_at']
 
@@ -76,7 +78,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             return EmployeeDetailSerializer
         return self.serializer_class
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def access_levels(self, request, employee_id=None):
         """Get all access levels for an employee"""
         employee = self.get_object()
@@ -85,7 +87,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def audit_logs(self, request, employee_id=None):
         """Get audit logs for an employee"""
         employee = self.get_object()
@@ -94,7 +96,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAccessManager])
     def grant_access(self, request, employee_id=None):
         """Grant an access level to an employee"""
         employee = self.get_object()
@@ -120,7 +122,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             employee=employee,
             access_level=access_level,
             defaults={
-                'granted_by': request.data.get('granted_by', request.user.username if hasattr(request, 'user') else 'API'),
+                'granted_by': request.data.get('granted_by', request.user.username),
                 'notes': request.data.get('notes', '')
             }
         )
@@ -143,14 +145,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             employee=employee,
             access_level=access_level,
             action='granted',
-            action_by=request.data.get('granted_by', request.user.username if hasattr(request, 'user') else 'API'),
+            action_by=request.user.username,
             notes=request.data.get('notes', '')
         )
         
         serializer = EmployeeAccessSerializer(employee_access)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAccessManager])
     def revoke_access(self, request, employee_id=None):
         """Revoke an access level from an employee"""
         employee = self.get_object()
@@ -179,7 +181,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # Revoke access
         employee_access.is_active = False
         employee_access.revoked_date = request.data.get('revoked_date')
-        employee_access.revoked_by = request.data.get('revoked_by', request.user.username if hasattr(request, 'user') else 'API')
+        employee_access.revoked_by = request.user.username
         employee_access.save()
         
         # Create audit log
@@ -187,7 +189,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             employee=employee,
             access_level=employee_access.access_level,
             action='revoked',
-            action_by=employee_access.revoked_by,
+            action_by=request.user.username,
             notes=request.data.get('notes', '')
         )
         
@@ -201,8 +203,9 @@ class EmployeeAccessViewSet(viewsets.ModelViewSet):
     """
     queryset = EmployeeAccess.objects.all()
     serializer_class = EmployeeAccessSerializer
+    permission_classes = [IsAccessManager]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_class = EmployeeAccessFilter
+    filterset_fields = ['employee__employee_id', 'access_level__access_id', 'is_active']
     search_fields = ['employee__first_name', 'employee__last_name', 'access_level__access_name']
     ordering_fields = ['granted_date', 'revoked_date']
 
@@ -213,7 +216,8 @@ class AccessAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = AccessAuditLog.objects.all()
     serializer_class = AccessAuditLogSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_class = AccessAuditLogFilter
+    filterset_fields = ['employee__employee_id', 'access_level__access_id', 'action']
     search_fields = ['employee__first_name', 'employee__last_name', 'access_level__access_name', 'action_by']
     ordering_fields = ['action_date']
