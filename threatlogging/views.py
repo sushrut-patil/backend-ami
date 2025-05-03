@@ -3,8 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import AccessLog, ActivityLog, ErrorLog
-from .serializers import AccessLogSerializer, ActivityLogSerializer, ErrorLogSerializer
+from django.contrib.contenttypes.models import ContentType
+from .models import AccessLog, ActivityLog, ErrorLog, Threat
+from .serializers import AccessLogSerializer, ActivityLogSerializer, ErrorLogSerializer, ThreatSerializer
 
 
 class AccessLogViewSet(viewsets.GenericViewSet,
@@ -113,20 +114,66 @@ class ErrorLogViewSet(viewsets.GenericViewSet,
             serializer = self.get_serializer(logs, many=True)
             return Response(serializer.data)
         return Response({"error": "Error type parameter is required"}, status=400)
-    
-from rest_framework import viewsets, mixins
-from .models import Threat
-from .serializers import ThreatSerializer
-from rest_framework.permissions import IsAuthenticated
+
 
 class ThreatViewSet(viewsets.GenericViewSet,
-                    mixins.ListModelMixin,
-                    mixins.RetrieveModelMixin,
-                    mixins.UpdateModelMixin,
-                    mixins.CreateModelMixin):
+                    viewsets.mixins.ListModelMixin,
+                    viewsets.mixins.RetrieveModelMixin,
+                    viewsets.mixins.UpdateModelMixin,
+                    viewsets.mixins.CreateModelMixin):
+    """
+    API endpoint for Threat CRUD operations.
+    """
     queryset = Threat.objects.all().order_by('-detected_at')
     serializer_class = ThreatSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['log_type', 'status', 'escalated']
     search_fields = ['description']
-    ordering_fields = ['detected_at', 'risk_score']
+    ordering_fields = ['detected_at', 'risk_score', 'status']
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def by_log_type(self, request):
+        """Get all threats for a specific log type"""
+        log_type = request.query_params.get('log_type', None)
+        if log_type:
+            threats = Threat.objects.filter(log_type=log_type).order_by('-detected_at')
+            serializer = self.get_serializer(threats, many=True)
+            return Response(serializer.data)
+        return Response({"error": "Log type parameter is required"}, status=400)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def by_status(self, request):
+        """Get all threats with a specific status"""
+        status = request.query_params.get('status', None)
+        if status:
+            threats = Threat.objects.filter(status=status).order_by('-detected_at')
+            serializer = self.get_serializer(threats, many=True)
+            return Response(serializer.data)
+        return Response({"error": "Status parameter is required"}, status=400)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def resolve(self, request, pk=None):
+        """Mark a threat as resolved"""
+        threat = self.get_object()
+        username = request.data.get('resolved_by', request.user.username)
+        
+        threat.status = 'Resolved'
+        threat.resolved_by = username
+        threat.resolved_at = timezone.now()
+        threat.save()
+        
+        serializer = self.get_serializer(threat)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def escalate(self, request, pk=None):
+        """Escalate a threat"""
+        threat = self.get_object()
+        
+        threat.status = 'Escalated'
+        threat.escalated = True
+        threat.save()
+        
+        serializer = self.get_serializer(threat)
+        return Response(serializer.data)

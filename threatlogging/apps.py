@@ -5,4 +5,4 @@ class ThreatloggingConfig(AppConfig):
     name = 'threatlogging'
 
     def ready(self):
-        import signal
+        import threatlogging.log_signal
