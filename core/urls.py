@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from django.urls import path, include
 from rest_framework.documentation import include_docs_urls
+from . import views
 
 import threatlogging
 
@@ -27,4 +28,6 @@ urlpatterns = [
     path('api/access/', include('access_management.urls')),
     path('docs/', include_docs_urls(title='Access Management API')),
     path('api/logs/', include('threatlogging.urls')),
+    path('api/threat-data/', views.get_threat_data, name='get_threat_data'),
+    path('api/threat-path/<str:path_id>/', views.get_threat_path, name='get_threat_path'),
 ]
