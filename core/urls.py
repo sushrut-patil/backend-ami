@@ -30,4 +30,5 @@ urlpatterns = [
     path('api/logs/', include('threatlogging.urls')),
     path('api/threat-data/', views.get_threat_data, name='get_threat_data'),
     path('api/threat-path/<str:path_id>/', views.get_threat_path, name='get_threat_path'),
+    path('api/security/',include('compliance_guard.urls'))
 ]
