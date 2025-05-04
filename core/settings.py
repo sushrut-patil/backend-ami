@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django_filters',
     'access_management',
     'threatlogging',
+    'compliance_guard',
 ]
 
 MIDDLEWARE = [
@@ -160,3 +161,5 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+GEMINI_API_KEY = 'AIzaSyBywvuqS6Qoiag4O4V_TQseZ0MR72aPGfI'

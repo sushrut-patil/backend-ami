@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/access/', include('access_management.urls')),
     path('docs/', include_docs_urls(title='Access Management API')),
     path('api/logs/', include('threatlogging.urls')),
+    path('api/security/',include('compliance_guard.urls'))
 ]
